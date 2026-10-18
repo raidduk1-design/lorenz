@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Butterfly Effect — the Lorenz system</title>
+<style>
+  :root{
+    --bg:#07090d; --card:rgba(13,17,24,.88); --line:#1d2634; --txt:#d9e4ee;
+    --mut:#7d8fa3; --dim:#6d8199; --cyan:#6fd6f2; --amber:#ffb454; --teal:#43d6b5; --green:#7ce8b5;
+    --mono:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:
+      radial-gradient(1100px 700px at 18% -10%, #0d1524 0%, transparent 60%),
+      radial-gradient(900px 600px at 100% 10%, #12100d 0%, transparent 55%),
+      var(--bg);
+    color:var(--txt);
+    font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1240px;margin:0 auto;padding:26px 20px 56px}
+  header{margin-bottom:18px}
+  h1{
+    font-size:clamp(24px,3.6vw,38px);letter-spacing:.2em;font-weight:800;
+    background:linear-gradient(90deg,#6fd6f2 10%,#d9e4ee 55%,#ffb454 95%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .sub{color:var(--mut);margin-top:6px;font-size:13.5px;letter-spacing:.04em}
+  .eq{
+    font-family:var(--mono);font-size:14.5px;color:#9fb4c8;margin-top:10px;
+    display:flex;gap:26px;flex-wrap:wrap;
+  }
+  .eq b{color:var(--amber);font-weight:700}
+  main{display:grid;grid-template-columns:minmax(0,1fr) 384px;gap:16px;align-items:start}
+  @media (max-width:980px){ main{grid-template-columns:1fr} }
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .left{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .stage{padding:10px}
+  .stage-head{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    font-size:11.5px;color:var(--mut);font-family:var(--mono);padding:4px 4px 10px;
+  }
+  .key{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .dotA{background:#cfe8ff;box-shadow:0 0 8px 2px rgba(140,215,255,.55)}
+  .dotB{background:#ffb454;box-shadow:0 0 8px 2px rgba(255,180,84,.5)}
+  .tread{margin-left:auto;color:#9fb4c8}
+  #scene{
+    width:100%;height:auto;aspect-ratio:8/5;display:block;border-radius:10px;cursor:grab;touch-action:none;
+    background:radial-gradient(620px 420px at 50% 44%, #0b1220 0%, #07090d 78%);
+  }
+  #scene:active{cursor:grabbing}
+  .stage-foot{font-size:11.5px;color:#8ba0b7;text-align:center;padding-top:9px;font-family:var(--mono)}
+  .side{display:flex;flex-direction:column;gap:14px}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+  .stat .k{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);margin-bottom:3px}
+  .stat .v{font:700 25px/1.15 var(--mono)}
+  #stLam{color:var(--cyan)} #stDim{color:var(--amber)} #stT{color:var(--green)}
+  #stT.long{font-size:13px;line-height:1.35;font-weight:600}
+  .stat .d{font-size:11px;color:#8ba0b7;margin-top:2px;line-height:1.4}
+  .chip{
+    display:inline-block;padding:4px 13px;border-radius:999px;
+    font:700 13px/1.3 var(--mono);letter-spacing:.08em;
+  }
+  .chip.chaotic{background:rgba(255,180,84,.13);color:var(--amber);border:1px solid rgba(255,180,84,.45)}
+  .chip.uncertain{background:rgba(111,214,242,.12);color:var(--cyan);border:1px solid rgba(111,214,242,.4)}
+  .chip.stable{background:rgba(124,232,181,.12);color:var(--green);border:1px solid rgba(124,232,181,.4)}
+  .h{font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:#b7c9da;font-weight:600;margin-bottom:3px}
+  .card .sub2{font-size:11.5px;color:#8ba0b7;margin-bottom:8px;line-height:1.45;min-height:17px}
+  .card canvas{width:100%;height:132px;display:block}
+  .controls{display:flex;flex-direction:column;gap:12px}
+  .sliders{display:flex;gap:22px;flex-wrap:wrap}
+  .sliders label{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:13.5px;color:#9fb4c8;flex:1;min-width:200px}
+  .sliders input[type=range]{flex:1;accent-color:var(--cyan);min-width:80px}
+  .sliders .val{font-family:var(--mono);color:var(--amber);min-width:42px;text-align:right;font-size:13px}
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .presets{display:flex;gap:8px;flex-wrap:wrap}
+  button{
+    background:#111927;border:1px solid #243244;color:#b9c9da;border-radius:8px;
+    font:12.5px/1 var(--mono);padding:7px 11px;cursor:pointer;transition:all .15s;
+  }
+  button:hover{border-color:var(--cyan);color:#eaf4fb}
+  button.on{background:rgba(111,214,242,.14);border-color:rgba(111,214,242,.55);color:var(--cyan)}
+  .lbl{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+  .speed{display:flex;gap:5px;align-items:center}
+  .rot{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--mut);font-family:var(--mono)}
+  .rot input{accent-color:var(--cyan)}
+  #recomp{font:11px var(--mono);color:var(--amber);opacity:0;transition:opacity .2s}
+  #recomp.on{opacity:1}
+  #scrub{width:100%;accent-color:var(--amber)}
+  footer{margin-top:26px;display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+  @media (max-width:980px){footer{grid-template-columns:1fr}}
+  footer h3{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#9fb4c8;margin-bottom:8px}
+  footer p{font-size:13.5px;color:var(--mut);line-height:1.65}
+  footer p b{color:#c6d4e2;font-weight:600}
+  .method{grid-column:1/-1;border-top:1px solid var(--line);padding-top:14px;font-size:11.5px;color:#7e93a9;line-height:1.6;font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>THE BUTTERFLY EFFECT</h1>
+    <p class="sub">The Lorenz system · E. N. Lorenz, MIT, 1963 · three equations, one strange attractor, the end of perfect prediction</p>
+    <p class="eq">
+      <span>ẋ = <b id="eqS">10.0</b>(y − x)</span>
+      <span>ẏ = x(<b id="eqR">28.0</b> − z) − y</span>
+      <span>ż = xy − <b id="eqB">2.67</b>z</span>
+    </p>
+  </header>
+
+  <main>
+    <div class="left">
+    <section class="card stage" aria-label="Three-dimensional view of the Lorenz attractor">
+      <div class="stage-head">
+        <span class="key"><span class="dot dotA"></span>forecast A</span>
+        <span class="key"><span class="dot dotB"></span>forecast B, nudged 10⁻⁸</span>
+        <span class="key">─ the growing error</span>
+        <span class="tread" id="tRead">t = 0.0 / 240</span>
+      </div>
+      <canvas id="scene" width="720" height="450" aria-label="Lorenz attractor, 3D"></canvas>
+      <div class="stage-foot">the glow is 240 time-units of one trajectory — the attractor itself · drag to rotate · scroll to zoom</div>
+    </section>
+
+    <section class="card controls">
+      <div class="sliders">
+        <label>σ <input type="range" id="sS" min="4" max="16" step="0.1" value="10"><span class="val" id="vS">10.0</span></label>
+        <label>ρ <input type="range" id="sR" min="1" max="170" step="0.5" value="28"><span class="val" id="vR">28.0</span></label>
+        <label>β <input type="range" id="sB" min="0.5" max="5" step="0.01" value="2.67"><span class="val" id="vB">2.67</span></label>
+      </div>
+      <div class="row">
+        <span class="lbl">presets</span>
+        <div class="presets">
+          <button data-p="8">dormant ρ=8</button>
+          <button data-p="20">dying spiral ρ=20</button>
+          <button data-p="28" class="on">the butterfly ρ=28</button>
+          <button data-p="160">order window ρ=160</button>
+          <button data-p="168">great storm ρ=168</button>
+        </div>
+        <span class="lbl" style="margin-left:auto">speed</span>
+        <div class="speed">
+          <button class="sp" data-s="0.5">½×</button>
+          <button class="sp on" data-s="1">1×</button>
+          <button class="sp" data-s="2">2×</button>
+          <button class="sp" data-s="4">4×</button>
+        </div>
+        <button id="bPlay" title="play / pause (space)">⏸</button>
+        <button id="bRestart" title="restart playback">⟲</button>
+        <label class="rot"><input type="checkbox" id="cRot" checked> auto-rotate</label>
+        <span id="recomp">computing…</span>
+      </div>
+      <input type="range" id="scrub" min="0" max="240" step="0.1" value="0" aria-label="replay position">
+    </section>
+    </div>
+
+    <aside class="side">
+      <div class="card stats">
+        <div class="stat"><div class="k">Lyapunov λ₁</div><div class="v" id="stLam">—</div><div class="d" id="stLamD">average exponential error growth, per unit time</div></div>
+        <div class="stat"><div class="k">Dimension D</div><div class="v" id="stDim">—</div><div class="d" id="stDimD">finite-sample box-counting estimate (K–Y D ≈ 2.06)</div></div>
+        <div class="stat"><div class="k">Horizon t*</div><div class="v" id="stT">—</div><div class="d">this pair's first crossing of error 1.0 — threshold-dependent, not universal</div></div>
+        <div class="stat"><div class="k">Status</div><div class="chip chaotic" id="stChip">…</div><div class="d" id="stChipD">…</div></div>
+      </div>
+
+      <div class="card">
+        <div class="h">Divergence of two forecasts</div>
+        <div class="sub2" id="dvSub">…</div>
+        <canvas id="cvDv" aria-label="Separation between the two forecasts, log scale"></canvas>
+      </div>
+      <div class="card">
+        <div class="h">Lyapunov exponent, converging</div>
+        <div class="sub2">the error vector is re-normalized exactly every 0.05 (by step count); the running log-stretch average settles onto λ₁</div>
+        <canvas id="cvLy" aria-label="Lyapunov exponent estimate over time"></canvas>
+      </div>
+      <div class="card">
+        <div class="h">Box-counting the attractor</div>
+        <div class="sub2">N(ε) = boxes of size ε touched by the orbit. Where N(ε) ≈ (1/ε)^D the log–log plot is straight and the slope is the box-counting estimate D̂ — a finite-sample result, valid only over the scales the sample covers.</div>
+        <canvas id="cvBc" aria-label="Box-counting plot"></canvas>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <div>
+      <h3>A weather model, three lines long</h3>
+      <p>In 1961–62, MIT meteorologist <b>Edward Lorenz</b> reduced a convection cell — warm fluid rising, cooling, sinking, the engine of weather — to three variables: <b>x</b>, the intensity of the convection; <b>y</b>, a temperature contrast between the ascending and descending currents; and <b>z</b>, how far the vertical temperature profile departs from linear. The result is the system above: a simplified model of convection, and one of the most studied objects in all of mathematics. The discovery itself came with his earlier, twelve-variable convection model: he interrupted one computation, re-entered the numbers rounded to three decimals, and the “forecast” came out completely different. Two years later he had distilled that behavior into the three equations above.</p>
+    </div>
+    <div>
+      <h3>A nudge of 10⁻⁸</h3>
+      <p>The two dots are identical forecasts; the amber one starts <b>10⁻⁸</b> farther from the origin (x = 1.00000001). For a dozen time-units they fly wing to wing. Then one loops slightly higher, and the error runs away: 10⁻⁸ becomes 1.0 in about 28 units on the classical system. <b>t*</b> is this pair's first crossing of a chosen error threshold: it shifts with the threshold, the starting pair, and even the integrator's step size — it is not a universal prediction deadline. This is <b>sensitive dependence on initial conditions</b> — the butterfly effect. The punchline is not that weather is random, but that <b>point forecasts from finite-precision data lose their edge after a few time-units</b>. That says how fast individual trajectories separate; it says little about probabilistic forecasts or the attractor's statistics, which the system retains.</p>
+    </div>
+    <div>
+      <h3>A shape between dimensions</h3>
+      <p>One trajectory never repeats and never wanders off: it lives on a <b>strange attractor</b> — a sheet folded into a fractal whose dimensions sit <b>slightly above 2</b>. The slope of our box-counting curve (≈ 1.6–1.9) is a <b>finite-sample estimate over the scales we count</b>, not the attractor's dimension — counting boxes on a finite orbit undershoots the true value. The established figures are higher: the Kaplan–Yorke dimension of the classical system is ≈ <b>2.06</b>, and correlation-dimension estimates also lie just above 2 (≈ 2.05). Not a curve, not an ordinary surface either. And λ₁ ≈ 0.9 says a tiny error <b>doubles every ln 2 / λ ≈ 0.8 time-units</b>. The same mathematics now appears in turbulence, climate, neurons, the heart and lasers.</p>
+    </div>
+    <p class="method">
+      Everything on this page is computed live in your browser from the equations above. Integrator: classical 4th-order Runge–Kutta, dt = 5×10⁻³. λ₁ by Wolf’s orbit-deviation method, re-normalized exactly every 0.05 time-units (by step count). D̂ by 3-D box-counting on ~38,000 orbit points (transient skipped), 9 box sizes — a finite-sample slope, not a dimension of the attractor (Kaplan–Yorke D ≈ 2.06, correlation D ≈ 2.05 for the classical system). The two forecasts start 10⁻⁸ apart in x. All runs are 240 time-units, and that is a real limit: near the Hopf point (ρ ≈ 24.74) transient stretching can make a finite-run λ₁ read positive on a motion that is ultimately stable. No libraries, no physics engine — just the equations.
+    </p>
+  </footer>
+</div>
+
+<noscript><p style="padding:20px;color:#ffb454">This demonstration needs JavaScript — all the physics runs right here in your browser.</p></noscript>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+
+/* ================= system ================= */
+const P = { sigma: 10, rho: 28, beta: 8 / 3 };
+const DT = 0.005;
+const N_STEPS = 48000;                 // 240 time-units
+const T_END = N_STEPS * DT;
+const D0 = 1e-8;                       // the nudge
+
+/* ---------- RK4 for the Lorenz ODE ---------- */
+function rk4(s) {
+  const sg = P.sigma, rh = P.rho, be = P.beta;
+  let x = s[0], y = s[1], z = s[2];
+  const a = sg * (y - x), b = x * (rh - z) - y, c = x * y - be * z;
+  let X = x + .5 * DT * a, Y = y + .5 * DT * b, Z = z + .5 * DT * c;
+  const a2 = sg * (Y - X), b2 = X * (rh - Z) - Y, c2 = X * Y - be * Z;
+  X = x + .5 * DT * a2; Y = y + .5 * DT * b2; Z = z + .5 * DT * c2;
+  const a3 = sg * (Y - X), b3 = X * (rh - Z) - Y, c3 = X * Y - be * Z;
+  X = x + DT * a3; Y = y + DT * b3; Z = z + DT * c3;
+  const a4 = sg * (Y - X), b4 = X * (rh - Z) - Y, c4 = X * Y - be * Z;
+  s[0] = x + DT / 6 * (a + 2 * a2 + 2 * a3 + a4);
+  s[1] = y + DT / 6 * (b + 2 * b2 + 2 * b3 + b4);
+  s[2] = z + DT / 6 * (c + 2 * c2 + 2 * c3 + c4);
+}
+
+/* ---------- RK4 for (state, linearized deviation vector) ---------- */
+function rk6(s, d) {
+  const sg = P.sigma, rh = P.rho, be = P.beta;
+  const h = DT;
+  let x = s[0], y = s[1], z = s[2], dx = d[0], dy = d[1], dz = d[2];
+  const st = (X, Y, Z, u, v, w) => {
+    const fx = sg * (Y - X), fy = X * (rh - Z) - Y, fz = X * Y - be * Z;
+    return [fx, fy, fz,
+      -sg * u + sg * v,
+      (rh - Z) * u - v - X * w,
+      Y * u + X * v - be * w];
+  };
+  const k1 = st(x, y, z, dx, dy, dz);
+  const k2 = st(x + .5*h*k1[0], y + .5*h*k1[1], z + .5*h*k1[2], dx + .5*h*k1[3], dy + .5*h*k1[4], dz + .5*h*k1[5]);
+  const k3 = st(x + .5*h*k2[0], y + .5*h*k2[1], z + .5*h*k2[2], dx + .5*h*k2[3], dy + .5*h*k2[4], dz + .5*h*k2[5]);
+  const k4 = st(x + h*k3[0], y + h*k3[1], z + h*k3[2], dx + h*k3[3], dy + h*k3[4], dz + h*k3[5]);
+  s[0] = x + h/6*(k1[0]+2*k2[0]+2*k3[0]+k4[0]);
+  s[1] = y + h/6*(k1[1]+2*k2[1]+2*k3[1]+k4[1]);
+  s[2] = z + h/6*(k1[2]+2*k2[2]+2*k3[2]+k4[2]);
+  d[0] = dx + h/6*(k1[3]+2*k2[3]+2*k3[3]+k4[3]);
+  d[1] = dy + h/6*(k1[4]+2*k2[4]+2*k3[4]+k4[4]);
+  d[2] = dz + h/6*(k1[5]+2*k2[5]+2*k3[5]+k4[5]);
+}
+
+/* ---------- data ---------- */
+let orbit = null, twin = null;
+let sepHist = null, lyapHist = null;
+let tStar = null, sepMin = [0, D0], lamFinal = 0, bbox = null;
+let colR = null, colG = null, colB = null;
+
+const EPS_LIST = [12.5, 6.25, 3.125, 1.5625, 0.78125, 0.390625, 0.1953125, 0.09765625, 0.048828125];
+let boxN = [], nBoxPts = 0, fitRange = [0, 0], Dval = 0;
+
+function recompute() {
+  const N = N_STEPS;
+  orbit = new Float32Array(N * 3);
+  twin = new Float32Array(N * 3);
+  sepHist = new Float32Array((N / 10) * 2);
+  lyapHist = new Float32Array(Math.floor((N - 1) / 200) * 2); // exactly the 239 samples that are filled (i>0 && i%200)
+  const sa = [1, 1, 1], sb = [1 + D0, 1, 1], ls = [1, 1, 1], ld = [D0, 0, 0];
+  let xmn = 1e9, xmx = -1e9, ymn = 1e9, ymx = -1e9, zmn = 1e9, zmx = -1e9;
+  let t = 0, lsum = 0, ns = 0, nl = 0;
+  tStar = null; sepMin = [0, D0];
+  for (let i = 0; i < N; i++) {
+    rk4(sa); rk4(sb);
+    const i3 = i * 3;
+    orbit[i3] = sa[0]; orbit[i3+1] = sa[1]; orbit[i3+2] = sa[2];
+    twin[i3] = sb[0]; twin[i3+1] = sb[1]; twin[i3+2] = sb[2];
+    if (sa[0] < xmn) xmn = sa[0]; if (sa[0] > xmx) xmx = sa[0];
+    if (sa[1] < ymn) ymn = sa[1]; if (sa[1] > ymx) ymx = sa[1];
+    if (sa[2] < zmn) zmn = sa[2]; if (sa[2] > zmx) zmx = sa[2];
+    if (i % 10 === 0) {
+      const sep = Math.max(1e-300, Math.hypot(sa[0]-sb[0], sa[1]-sb[1], sa[2]-sb[2]));
+      sepHist[ns*2] = t + DT; sepHist[ns*2+1] = sep;
+      if (sep < sepMin[1]) sepMin = [t + DT, sep];
+      if (tStar === null && sep >= 1) tStar = t + DT;
+      ns++;
+    }
+    rk6(ls, ld);
+    t += DT;
+    if ((i + 1) % 10 === 0) {   // exactly every 0.05 = 10 steps (integer count — no floating-point drift)
+      let nrm = Math.hypot(ld[0], ld[1], ld[2]);
+      if (nrm < 1e-200) nrm = 1e-200;
+      lsum += Math.log(nrm / D0);
+      const k = D0 / nrm; ld[0] *= k; ld[1] *= k; ld[2] *= k;
+    }
+    if (i > 0 && i % 200 === 0) {
+      lyapHist[nl*2] = t; lyapHist[nl*2+1] = lsum / t;
+      nl++;
+    }
+  }
+  lamFinal = lsum / t;
+  bbox = { xmn, xmx, ymn, ymx, zmn, zmx };
+  computeBoxes();
+  fitDim();
+  computeColors();
+  updateDerivedUI();
+}
+
+function computeBoxes() {
+  const skip = 9600, stride = 1; // skip the transient so only the converged set is counted
+  nBoxPts = Math.floor((N_STEPS - skip) / stride);
+  boxN = new Array(EPS_LIST.length);
+  for (let e = 0; e < EPS_LIST.length; e++) {
+    const eps = EPS_LIST[e], set = new Set();
+    for (let i = skip; i < N_STEPS; i += stride) {
+      const i3 = i * 3;
+      const ix = Math.floor(orbit[i3] / eps);
+      const iy = Math.floor(orbit[i3+1] / eps);
+      const iz = Math.floor(orbit[i3+2] / eps);
+      set.add(ix + ',' + iy + ',' + iz); // string keys: the old 32-bit shift packing collided for z indices 256 apart
+    }
+    boxN[e] = set.size;
+  }
+}
+
+function fitDim() {
+  const n = boxN.length;
+  let best = null, cur = -1;
+  for (let i = 0; i < n; i++) {
+    const ok = boxN[i] >= 40 && boxN[i] <= 0.75 * nBoxPts;
+    if (ok) {
+      if (cur < 0) cur = i;
+      if (!best || i - cur + 1 > best[1] - best[0] + 1) best = [cur, i];
+    } else cur = -1;
+  }
+  if (!best || best[1] - best[0] < 2) {
+    if (boxN[3] < 10) { fitRange = [3, 3]; Dval = 0; return; }
+    best = [1, n - 2];
+  }
+  fitRange = best;
+  const a = best[0], b = best[1];
+  let sx = 0, sy = 0, sxx = 0, sxy = 0, cnt = b - a + 1;
+  for (let i = a; i <= b; i++) {
+    const x = Math.log10(1 / EPS_LIST[i]), y = Math.log10(boxN[i]);
+    sx += x; sy += y; sxx += x * x; sxy += x * y;
+  }
+  Dval = (cnt * sxy - sx * sy) / (cnt * sxx - sx * sx);
+}
+
+/* ---------- palette ---------- */
+const PAL_N = 256;
+const palR = new Float32Array(PAL_N), palG = new Float32Array(PAL_N), palB = new Float32Array(PAL_N);
+{
+  const stops = [[0,60,84,200],[0.28,56,140,235],[0.52,64,210,200],[0.76,255,186,88],[1,255,238,212]];
+  for (let i = 0; i < PAL_N; i++) {
+    const u = i / (PAL_N - 1);
+    let j = 0;
+    while (j < stops.length - 2 && u > stops[j+1][0]) j++;
+    const [u0,r0,g0,b0] = stops[j], [u1,r1,g1,b1] = stops[j+1];
+    const f = Math.min(1, Math.max(0, (u - u0) / (u1 - u0)));
+    palR[i] = r0 + (r1 - r0) * f; palG[i] = g0 + (g1 - g0) * f; palB[i] = b0 + (b1 - b0) * f;
+  }
+}
+function computeColors() {
+  const zlo = bbox.zmn, span = Math.max(1e-6, bbox.zmx - bbox.zmn);
+  colR = new Float32Array(N_STEPS); colG = new Float32Array(N_STEPS); colB = new Float32Array(N_STEPS);
+  for (let i = 0; i < N_STEPS; i++) {
+    const u = Math.min(1, Math.max(0, (orbit[i*3+2] - zlo) / span));
+    const k = (u * (PAL_N - 1)) | 0;
+    colR[i] = palR[k] / 255; colG[i] = palG[k] / 255; colB[i] = palB[k] / 255;
+  }
+}
+
+/* ---------- camera ---------- */
+const cam = { yaw: 1.35, pitch: 0.34, dist: 2.75, R: 1, cx: 0, cy: 0, cz: 0 };
+function fitCamera() {
+  cam.cx = (bbox.xmn + bbox.xmx) / 2;
+  cam.cy = (bbox.ymn + bbox.ymx) / 2;
+  cam.cz = (bbox.zmn + bbox.zmx) / 2;
+  cam.R = Math.max(bbox.xmx - bbox.xmn, bbox.ymx - bbox.ymn, (bbox.zmx - bbox.zmn) * 0.85) / 2 * 0.98;
+  if (cam.R < 0.5) cam.R = 0.5;
+}
+let CY = 1, SY = 0, CP = 1, SP = 0;
+function updateTrig() {
+  CY = Math.cos(cam.yaw); SY = Math.sin(cam.yaw);
+  CP = Math.cos(cam.pitch); SP = Math.sin(cam.pitch);
+}
+
+/* ---------- scene rendering ---------- */
+const scene = $('scene');
+const sctx = scene.getContext('2d');
+const GW = scene.width, GH = scene.height;
+const glow = document.createElement('canvas');
+glow.width = GW; glow.height = GH;
+const gctx = glow.getContext('2d');
+const gimg = gctx.createImageData(GW, GH);
+const accR = new Float32Array(GW * GH), accG = new Float32Array(GW * GH), accB = new Float32Array(GW * GH);
+let stride = 1;
+
+function renderGlow() {
+  accR.fill(0); accG.fill(0); accB.fill(0);
+  const R = cam.R, cx = cam.cx, cy2 = cam.cy, cz = cam.cz;
+  const fl = 2.6, d = cam.dist, unit = GH * 0.55;
+  const w0 = GW / 2, h0 = GH / 2;
+  for (let i = 0; i < N_STEPS; i += stride) {
+    const i3 = i * 3;
+    const u = (orbit[i3] - cx) / R, v = (orbit[i3+1] - cy2) / R, w = (orbit[i3+2] - cz) / R;
+    const x1 = u * CY - v * SY;
+    const y1 = u * SY + v * CY;
+    const y2 = y1 * CP - w * SP;
+    const z2 = y1 * SP + w * CP;
+    const dep = d + z2;
+    if (dep < 0.5) continue;
+    const s = fl / dep;
+    const px = w0 + x1 * s * unit, py = h0 - y2 * s * unit;
+    if (px < 1 || px >= GW - 1 || py < 1 || py >= GH - 1) continue;
+    const idx = (py | 0) * GW + (px | 0);
+    const g = s * s;
+    const r = colR[i] * g, gg = colG[i] * g, bb = colB[i] * g;
+    accR[idx] += r;  accG[idx] += gg;  accB[idx] += bb;
+    accR[idx-1] += r*.3; accR[idx+1] += r*.3; accR[idx-GW] += r*.3; accR[idx+GW] += r*.3;
+    accG[idx-1] += gg*.3; accG[idx+1] += gg*.3; accG[idx-GW] += gg*.3; accG[idx+GW] += gg*.3;
+    accB[idx-1] += bb*.3; accB[idx+1] += bb*.3; accB[idx-GW] += bb*.3; accB[idx+GW] += bb*.3;
+  }
+  const data = gimg.data, gain = 0.55, nPix = GW * GH;
+  for (let i = 0, j = 0; i < nPix; i++, j += 4) {
+    if (accR[i] + accG[i] + accB[i] < 0.005) { data[j+3] = 0; continue; }
+    data[j]   = (1 - Math.exp(-accR[i] * gain)) * 255;
+    data[j+1] = (1 - Math.exp(-accG[i] * gain)) * 255;
+    data[j+2] = (1 - Math.exp(-accB[i] * gain)) * 255;
+    data[j+3] = 255;
+  }
+  gctx.putImageData(gimg, 0, 0);
+}
+
+function proj(x, y, z) {
+  const u = (x - cam.cx) / cam.R, v = (y - cam.cy) / cam.R, w = (z - cam.cz) / cam.R;
+  const x1 = u * CY - v * SY, y1 = u * SY + v * CY;
+  const y2 = y1 * CP - w * SP, z2 = y1 * SP + w * CP;
+  const dep = cam.dist + z2;
+  const s = 2.6 / Math.max(0.5, dep);
+  const unit = GH * 0.55;
+  return [GW / 2 + x1 * s * unit, GH / 2 - y2 * s * unit];
+}
+
+let tPlay = 0;
+function drawTrail(arr, i0, i1, rgb, wdt, amax) {
+  if (i0 < 0) i0 = 0;
+  sctx.lineWidth = wdt;
+  for (let i = i0; i < i1; i++) {
+    const p = proj(arr[i*3], arr[i*3+1], arr[i*3+2]);
+    const q = proj(arr[(i+1)*3], arr[(i+1)*3+1], arr[(i+1)*3+2]);
+    const f = (i - i0) / (i1 - i0);
+    sctx.strokeStyle = `rgba(${rgb},${(f * f * amax).toFixed(3)})`;
+    sctx.beginPath(); sctx.moveTo(p[0], p[1]); sctx.lineTo(q[0], q[1]); sctx.stroke();
+  }
+}
+function drawDot(p, rgb, r, core) {
+  const g = sctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], r);
+  g.addColorStop(0, `rgba(${rgb},0.85)`); g.addColorStop(1, `rgba(${rgb},0)`);
+  sctx.fillStyle = g;
+  sctx.beginPath(); sctx.arc(p[0], p[1], r, 0, 7); sctx.fill();
+  if (core) {
+    sctx.fillStyle = 'rgba(255,255,255,0.95)';
+    sctx.beginPath(); sctx.arc(p[0], p[1], 2, 0, 7); sctx.fill();
+  }
+}
+function drawHeads() {
+  const i = Math.min(N_STEPS - 2, Math.max(0, Math.floor(tPlay / DT)));
+  const A = proj(orbit[i*3], orbit[i*3+1], orbit[i*3+2]);
+  const B = proj(twin[i*3], twin[i*3+1], twin[i*3+2]);
+  const iA = Math.max(0, i - 160);
+  const iB = Math.max(0, i - 70);
+  drawTrail(orbit, iA, i, '120,215,255', 1.5, 0.75);
+  drawTrail(twin, iB, i, '255,178,92', 1.1, 0.6);
+  sctx.strokeStyle = 'rgba(255,255,255,0.22)';
+  sctx.lineWidth = 1;
+  sctx.beginPath(); sctx.moveTo(A[0], A[1]); sctx.lineTo(B[0], B[1]); sctx.stroke();
+  drawDot(B, '255,178,92', 14, false);
+  drawDot(A, '140,220,255', 15, true);
+}
+function renderScene() {
+  updateTrig();
+  renderGlow();
+  sctx.clearRect(0, 0, GW, GH);
+  sctx.drawImage(glow, 0, 0);
+  drawHeads();
+}
+
+/* ---------- charts ---------- */
+const charts = [];
+function makeChart(id) {
+  const cv = $(id);
+  const c = { cv, ctx: cv.getContext('2d'), w: 0, h: 0 };
+  charts.push(c);
+  return c;
+}
+const cDv = makeChart('cvDv'), cLy = makeChart('cvLy'), cBc = makeChart('cvBc');
+function sizeCharts() {
+  for (const c of charts) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const r = c.cv.getBoundingClientRect();
+    c.cv.width = Math.max(60, r.width * dpr);
+    c.cv.height = Math.max(60, r.height * dpr);
+    c.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.w = r.width; c.h = r.height;
+  }
+}
+const MONO = '10.5px ui-monospace, Consolas, monospace';
+
+function drawDv(c) {
+  const { ctx, w, h } = c;
+  ctx.clearRect(0, 0, w, h);
+  const padL = 42, padR = 6, padT = 6, padB = 16;
+  const pw = w - padL - padR, ph = h - padT - padB;
+  const yLo = -13.5, yHi = 1.8;
+  const X = t => padL + (t / T_END) * pw;
+  const Y = v => padT + (1 - (v - yLo) / (yHi - yLo)) * ph;
+  ctx.font = MONO;
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(120,140,160,0.2)';
+  ctx.fillStyle = '#9cb1c6';
+  for (let e = -12; e <= 1; e += 2) {
+    const y = Y(e);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+    ctx.fillText('1e' + e, 2, y + 3);
+  }
+  for (let t = 0; t <= T_END + 1; t += 40) {
+    const x = X(Math.min(T_END, t));
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, h - padB); ctx.stroke();
+    ctx.fillText(String(t), x - 8, h - 4);
+  }
+  // measured separation
+  ctx.strokeStyle = '#cfe8ff'; ctx.lineWidth = 1.3; ctx.beginPath();
+  const nS = sepHist.length / 2;
+  for (let i = 0; i < nS; i++) {
+    const t = sepHist[i*2];
+    const v = Math.max(yLo, Math.min(yHi, Math.log10(sepHist[i*2+1])));
+    const x = X(t), y = Y(v);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  // exponential reference from the closest approach
+  if (lamFinal > 0.01 && sepMin[1] > 1e-30) {
+    const ym = Math.max(yLo, Math.log10(sepMin[1]));
+    const t0m = sepMin[0];
+    const t1m = Math.min(T_END, t0m + (yHi - ym) * Math.LN10 / lamFinal);
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(255,180,92,0.85)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(X(t0m), Y(ym)); ctx.lineTo(X(t1m), Y(Math.min(yHi, ym + (t1m - t0m) * lamFinal / Math.LN10)));
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,180,92,0.9)';
+    ctx.fillText('e^{λ₁t}', X(Math.min(T_END, t0m + 6)), Y(Math.min(yHi, ym + 6 * lamFinal / Math.LN10)) - 5);
+  }
+  // t* marker
+  if (tStar !== null && tStar <= T_END) {
+    const x = X(tStar);
+    ctx.setLineDash([2, 3]); ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, h - padB); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#eaf4fb';
+    ctx.fillText('t*=' + tStar.toFixed(1), x + 4, padT + 9);
+  }
+  // cursor
+  const xc = X(tPlay);
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.beginPath(); ctx.moveTo(xc, padT); ctx.lineTo(xc, h - padB); ctx.stroke();
+  const i = Math.min(nS - 1, Math.max(0, Math.floor(tPlay / 0.05)));
+  const vy = Y(Math.max(yLo, Math.min(yHi, Math.log10(sepHist[i*2+1]))));
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(xc, vy, 2.5, 0, 7); ctx.fill();
+}
+
+let lyapIdx = 0;
+function drawLyap(c) {
+  const { ctx, w, h } = c;
+  ctx.clearRect(0, 0, w, h);
+  const padL = 42, padR = 6, padT = 6, padB = 16;
+  const pw = w - padL - padR, ph = h - padT - padB;
+  let lo = 0, hi = 0;
+  for (let i = 0; i < lyapHist.length; i += 2) {
+    const v = lyapHist[i+1];
+    if (v < lo) lo = v; if (v > hi) hi = v;
+  }
+  lo = Math.max(-1.7, Math.min(-0.3, lo - 0.06));
+  hi = Math.min(2.0, Math.max(1.2, hi + 0.06));
+  const X = t => padL + (t / T_END) * pw;
+  const Y = v => padT + (1 - (v - lo) / (hi - lo)) * ph;
+  ctx.font = MONO; ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(120,140,160,0.2)'; ctx.fillStyle = '#9cb1c6';
+  for (let t = 0; t <= T_END + 1; t += 40) {
+    const x = X(Math.min(T_END, t));
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, h - padB); ctx.stroke();
+    ctx.fillText(String(t), x - 8, h - 4);
+  }
+  const yv = Y(0);
+  ctx.setLineDash([3, 4]);
+  ctx.strokeStyle = 'rgba(160,175,195,0.4)';
+  ctx.beginPath(); ctx.moveTo(padL, yv); ctx.lineTo(w - padR, yv); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillText('0', 24, yv + 3);
+  // curve
+  ctx.strokeStyle = '#43d6b5'; ctx.lineWidth = 1.4; ctx.beginPath();
+  for (let i = 0; i < lyapHist.length; i += 2) {
+    const x = X(lyapHist[i]), y = Y(Math.max(lo, Math.min(hi, lyapHist[i+1])));
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  // converged reference
+  const yf = Y(Math.max(lo, Math.min(hi, lamFinal)));
+  ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(255,180,92,0.85)';
+  ctx.beginPath(); ctx.moveTo(padL, yf); ctx.lineTo(w - padR, yf); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255,180,92,0.9)';
+  ctx.fillText('λ₁=' + lamFinal.toFixed(3), w - padR - 62, yf - 4);
+  // cursor
+  while (lyapIdx < lyapHist.length / 2 - 1 && lyapHist[(lyapIdx+1)*2] <= tPlay) lyapIdx++;
+  const lamNow = lyapHist[lyapIdx*2+1];
+  const xc = X(tPlay);
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.beginPath(); ctx.moveTo(xc, padT); ctx.lineTo(xc, h - padB); ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(xc, Y(Math.max(lo, Math.min(hi, lamNow))), 2.5, 0, 7); ctx.fill();
+}
+
+let reveal = 1;
+function drawBox(c) {
+  const { ctx, w, h } = c;
+  ctx.clearRect(0, 0, w, h);
+  const padL = 40, padR = 8, padT = 8, padB = 18;
+  const pw = w - padL - padR, ph = h - padT - padB;
+  const n = boxN.length;
+  let xmin = 1e9, xmax = -1e9, ymin = 1e9, ymax = -1e9;
+  for (let i = 0; i < n; i++) {
+    const x = Math.log10(1 / EPS_LIST[i]), y = Math.log10(Math.max(1, boxN[i]));
+    if (x < xmin) xmin = x; if (x > xmax) xmax = x;
+    if (y < ymin) ymin = y; if (y > ymax) ymax = y;
+  }
+  xmin -= 0.12; xmax += 0.12; ymin -= 0.35; ymax += 0.35;
+  const X = x => padL + (x - xmin) / (xmax - xmin) * pw;
+  const Y = y => padT + (1 - (y - ymin) / (ymax - ymin)) * ph;
+  ctx.font = MONO; ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(120,140,160,0.2)'; ctx.fillStyle = '#9cb1c6';
+  for (let g = 0; g <= 4; g++) {
+    const y = padT + ph * g / 4;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+    const val = ymax - (ymax - ymin) * g / 4;
+    ctx.fillText(val.toFixed(1), 2, y + 3);
+  }
+  ctx.fillText('log10 N(ε)', padL + 2, h - 4);
+  ctx.fillText('log10(1/ε) →', w - padR - 76, h - 4);
+  // points
+  const count = Math.ceil(reveal * n);
+  ctx.fillStyle = '#6fd6f2';
+  for (let i = 0; i < Math.min(count, n); i++) {
+    const x = X(Math.log10(1 / EPS_LIST[i])), y = Y(Math.log10(Math.max(1, boxN[i])));
+    ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fill();
+  }
+  // fit line
+  if (reveal > 0.99 && fitRange[1] > fitRange[0]) {
+    let xc = 0, yc = 0, cnt = fitRange[1] - fitRange[0] + 1;
+    for (let i = fitRange[0]; i <= fitRange[1]; i++) {
+      xc += Math.log10(1 / EPS_LIST[i]); yc += Math.log10(Math.max(1, boxN[i]));
+    }
+    xc /= cnt; yc /= cnt;
+    ctx.strokeStyle = 'rgba(255,180,92,0.9)'; ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(X(xmin), Y(yc + Dval * (xmin - xc)));
+    ctx.lineTo(X(xmax), Y(yc + Dval * (xmax - xc)));
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,180,92,0.95)';
+    ctx.fillText('D̂ ≈ ' + Dval.toFixed(2) + ' — finite-sample slope', padL + 8, padT + 12);
+  }
+}
+
+/* ---------- derived UI ---------- */
+function updateDerivedUI() {
+  const lam = lamFinal;
+  let status, cls, chipD, dvSub;
+  if (lam > 0.04) {
+    status = 'CHAOTIC'; cls = 'chaotic';
+    chipD = 'errors grow on average like e^{λ₁t}';
+    dvSub = 'they hover near 10⁻⁸, then the error runs away and saturates at the size of the attractor. Past t* the two forecasts look unrelated.';
+  } else if (lam > -0.04) {
+    status = 'NEAR ZERO'; cls = 'uncertain';
+    chipD = 'λ₁ ≈ 0 — a 240-unit run cannot separate weak chaos from a long-period orbit';
+    dvSub = 'average error growth is too small to classify on this run: if it is chaos it is extremely weak; a periodic orbit (an order window) looks exactly like this.';
+  } else {
+    status = 'STABLE'; cls = 'stable';
+    chipD = 'errors decay; the motion settles';
+    dvSub = 'the error decays — the twin forecast merges back onto the orbit. This motion is predictable.';
+  }
+  const chip = $('stChip');
+  chip.textContent = status;
+  chip.className = 'chip ' + cls;
+  $('stChipD').textContent = chipD;
+  $('dvSub').textContent = dvSub;
+  $('stDimD').textContent = 'finite-sample box-count slope of this ' + T_END + '-unit run — a fit, not a dimension: it cannot classify the attractor as point, curve or sheet (K–Y D ≈ 2.06 for the classical system)';
+  const reached = tStar !== null;
+  $('stT').textContent = reached ? tStar.toFixed(1) : 'not reached within ' + T_END;
+  $('stT').classList.toggle('long', !reached);
+  $('stLamD').textContent = 'finite-run average error growth, per unit time';
+}
+
+/* ---------- controls ---------- */
+let recomputeTimer = null;
+function scheduleRecompute() {
+  $('recomp').classList.add('on');
+  clearTimeout(recomputeTimer);
+  recomputeTimer = setTimeout(doRecompute, 140);
+}
+function doRecompute() {
+  recompute();
+  fitCamera();
+  tPlay = 0; lyapIdx = 0; reveal = 0;
+  $('recomp').classList.remove('on');
+  syncScrub();
+}
+function setParams(s, r, b) {
+  P.sigma = s; P.rho = r; P.beta = b;
+  $('sS').value = s; $('sR').value = r; $('sB').value = b;
+  $('vS').textContent = s.toFixed(1); $('vR').textContent = r.toFixed(1); $('vB').textContent = b.toFixed(2);
+  $('eqS').textContent = s.toFixed(1); $('eqR').textContent = r.toFixed(1); $('eqB').textContent = b.toFixed(2);
+  document.querySelectorAll('.presets button').forEach(bt =>
+    bt.classList.toggle('on', Math.abs(parseFloat(bt.dataset.p) - r) < 0.26 && Math.abs(s - 10) < 0.01 && Math.abs(b - 8 / 3) < 0.01));
+  scheduleRecompute();
+}
+['sS','sR','sB'].forEach((id, k) => {
+  $(id).addEventListener('input', () => {
+    setParams(parseFloat($('sS').value), parseFloat($('sR').value), parseFloat($('sB').value));
+  });
+});
+document.querySelectorAll('.presets button').forEach(bt =>
+  bt.addEventListener('click', () => {
+    document.querySelectorAll('.presets button').forEach(x => x.classList.remove('on'));
+    bt.classList.add('on');
+    setParams(10, parseFloat(bt.dataset.p), 8 / 3);
+  }));
+
+let playing = true, speed = 1;
+document.querySelectorAll('.sp').forEach(bt =>
+  bt.addEventListener('click', () => {
+    speed = parseFloat(bt.dataset.s);
+    document.querySelectorAll('.sp').forEach(x => x.classList.toggle('on', x === bt));
+  }));
+$('bPlay').addEventListener('click', () => {
+  playing = !playing;
+  $('bPlay').textContent = playing ? '⏸' : '▶';
+});
+$('bRestart').addEventListener('click', () => { tPlay = 0; lyapIdx = 0; syncScrub(); });
+let scrubbing = false;
+$('scrub').addEventListener('pointerdown', () => scrubbing = true);
+window.addEventListener('pointerup', () => scrubbing = false);
+$('scrub').addEventListener('input', () => { tPlay = parseFloat($('scrub').value); lyapIdx = 0; });
+function syncScrub() { if (!scrubbing) $('scrub').value = tPlay; }
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); $('bPlay').click(); }
+  if (e.target === document.body && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    tPlay = Math.max(0, Math.min(T_END, tPlay + (e.key === 'ArrowRight' ? 2 : -2)));
+    lyapIdx = 0;
+  }
+});
+
+/* ---------- scene interaction ---------- */
+let dragging = false, px0 = 0, py0 = 0, yaw0 = 0, pitch0 = 0;
+scene.addEventListener('pointerdown', e => {
+  dragging = true; px0 = e.clientX; py0 = e.clientY; yaw0 = cam.yaw; pitch0 = cam.pitch;
+  scene.setPointerCapture(e.pointerId);
+});
+scene.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  cam.yaw = yaw0 + (e.clientX - px0) * 0.005;
+  cam.pitch = Math.max(-1.4, Math.min(1.4, pitch0 + (e.clientY - py0) * 0.005));
+});
+scene.addEventListener('pointerup', () => dragging = false);
+scene.addEventListener('wheel', e => {
+  e.preventDefault();
+  cam.dist = Math.max(2.0, Math.min(7, cam.dist * (1 + e.deltaY * 0.001)));
+}, { passive: false });
+
+/* ---------- stats ---------- */
+function updateStats() {
+  while (lyapIdx < lyapHist.length / 2 - 1 && lyapHist[(lyapIdx+1)*2] <= tPlay) lyapIdx++;
+  const lamNow = lyapHist[lyapIdx*2+1];
+  // headline shows the converged exponent; the chart shows it settling live
+  $('stLam').textContent = lamFinal.toFixed(3);
+  $('stDim').textContent = Dval === 0 ? '0.00' : Dval.toFixed(2);
+  $('tRead').textContent = 't = ' + tPlay.toFixed(1) + ' / ' + T_END;
+}
+
+/* ---------- main loop ---------- */
+let last = performance.now(), ftAcc = 0, ftN = 0, lastQ = 0;
+function frame(now) {
+  const dtMs = now - last; last = now;
+  const dt = Math.min(0.05, dtMs / 1000);
+  if (playing) {
+    tPlay += dt * 24 * speed;
+    if (tPlay > T_END) { tPlay = tPlay % T_END; lyapIdx = 0; } // cursor resets with the wrap
+  }
+  if ($('cRot').checked && !dragging) cam.yaw += dt * 0.22;
+  reveal = Math.min(1, reveal + dt * 0.8);
+  renderScene();
+  drawDv(cDv); drawLyap(cLy); drawBox(cBc);
+  updateStats();
+  syncScrub();
+  ftAcc += dtMs; ftN++;
+  if (ftN === 50) {
+    const avg = ftAcc / ftN; ftAcc = 0; ftN = 0;
+    if (avg > 26 && stride === 1 && now - lastQ > 2500) { stride = 2; lastQ = now; }
+    else if (avg < 14 && stride === 2 && now - lastQ > 5000) { stride = 1; lastQ = now; }
+  }
+  requestAnimationFrame(frame);
+}
+
+window.addEventListener('resize', sizeCharts);
+sizeCharts();
+doRecompute();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
